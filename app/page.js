@@ -40,11 +40,13 @@ async function makeQR(vpa, name, amount, note) {
 // show an app chooser.
 function appLinks(vpa, name, amount, note) {
   const params = `pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${Math.round(amount)}&cu=INR&tn=${encodeURIComponent(note || "")}`;
+  // Android Intent URLs — Chrome's official method to launch apps.
+  // Falls back to Play Store if app not installed.
   return {
-    any: `upi://pay?${params}`,
-    gpay: `tez://upi/pay?${params}`,
-    phonepe: `phonepe://pay?${params}`,
-    paytm: `paytmmp://pay?${params}`,
+    any: `intent://pay?${params}#Intent;scheme=upi;end`,
+    gpay: `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.navi;end`,
+    phonepe: `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`,
+    paytm: `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`,
   };
 }
 
@@ -271,12 +273,40 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
           <button className="primary wide" onClick={showPay}>Pay {name(treasurerId)} by UPI</button>
         ) : (
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>Scan to pay {name(treasurerId)} {inr(amount)}</p>
-            <img src={qr} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
-            <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0", wordBreak: "break-all" }}>{vpa(treasurerId)}</p>
-            <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 4 }}>— or open an app —</div>
-            <UpiPayButtons vpa={vpa(treasurerId)} name={name(treasurerId)} amount={Number(amount)} note={data.house.name + " fund"} />
-            <button className="primary wide" onClick={confirmPaid} style={{ marginTop: 12 }}>I've paid — add to fund</button>
+            <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{name(treasurerId)}</b> {inr(amount)}</p>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>UPI: {vpa(treasurerId)}</p>
+
+            {(() => {
+              const links = appLinks(vpa(treasurerId), name(treasurerId), Number(amount), data.house.name + " fund");
+              const apps = [
+                ["any", "🔗 Any UPI", "#8b7cf6"],
+                ["gpay", "💚 GPay", "#2DA94F"],
+                ["phonepe", "💜 PhonePe", "#5F259F"],
+                ["paytm", "💙 Paytm", "#00BAF2"],
+              ];
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                  {apps.map(([key, label, color]) => (
+                    <a key={key} href={links[key]} className="upi-app-btn" style={{ borderColor: color, color, fontSize: 13, textDecoration: "none" }}>
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <button className="wide small" onClick={() => { navigator.clipboard.writeText(vpa(treasurerId)); alert("Copied: " + vpa(treasurerId)); }} style={{ marginBottom: 12 }}>
+              📋 Copy UPI ID & pay manually
+            </button>
+
+            <details style={{ textAlign: "center", marginBottom: 14 }}>
+              <summary style={{ fontSize: 12, color: "var(--muted)", cursor: "pointer" }}>Or scan QR code</summary>
+              <div style={{ marginTop: 10 }}>
+                <img src={qr} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
+              </div>
+            </details>
+
+            <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>✅ Payment done — add to fund</button>
           </div>
         )}
         <p className="hint">You pay the treasurer directly by UPI. Confirming records it in the fund.</p>
@@ -432,19 +462,17 @@ function Review({ data, name, vpa, onDone }) {
     );
   }
 
-  // ---- PAY SCREEN (QR + app buttons + instant confirm) ----
+  // ---- PAY SCREEN (QR + app tabs + copy fallback) ----
   if (payQr) {
     const links = appLinks(payQr.vpa, payQr.name, payQr.amount, "Reimbursement");
     const apps = [
-      ["gpay", "Google Pay", "#2DA94F"],
-      ["phonepe", "PhonePe", "#5F259F"],
-      ["paytm", "Paytm", "#00BAF2"],
+      ["any", "🔗 Any UPI", "#8b7cf6"],
+      ["gpay", "💚 GPay", "#2DA94F"],
+      ["phonepe", "💜 PhonePe", "#5F259F"],
+      ["paytm", "💙 Paytm", "#00BAF2"],
     ];
 
-    async function payAndConfirm(link) {
-      // Open UPI app if on phone
-      if (link) window.location.href = link;
-      // Mark as paid immediately
+    async function confirmPaid() {
       const res = await api("advanceReimbursement", { reimbId: payQr.id, toStatus: "paid", note: "" });
       if (res.ok) {
         setPaySuccess({ name: payQr.name, amount: payQr.amount });
@@ -456,28 +484,54 @@ function Review({ data, name, vpa, onDone }) {
       }
     }
 
+    function copyUPI() {
+      navigator.clipboard.writeText(payQr.vpa).then(() => alert("UPI ID copied: " + payQr.vpa)).catch(() => {
+        // fallback for older browsers
+        const t = document.createElement("textarea");
+        t.value = payQr.vpa;
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand("copy");
+        document.body.removeChild(t);
+        alert("UPI ID copied: " + payQr.vpa);
+      });
+    }
+
     return (
       <>
         <Header icon="💸" title="Pay reimbursement" sub={"Pay " + payQr.name} />
         <div className="card" style={{ textAlign: "center" }}>
           <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{payQr.name}</b></p>
-          <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 6 }}>{inr(payQr.amount)}</div>
-          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, wordBreak: "break-all" }}>UPI: {payQr.vpa}</p>
-          <img src={payQr.img} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
-          <p style={{ fontSize: 12, color: "var(--muted)", margin: "12px 0 6px" }}>Scan QR above, or tap an app below:</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 4 }}>{inr(payQr.amount)}</div>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>UPI: {payQr.vpa}</p>
+
+          <h2 style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Step 1: Pay using any method</h2>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             {apps.map(([key, label, color]) => (
-              <a key={key} href="#" className="upi-app-btn" style={{ borderColor: color, color, fontSize: 12 }}
-                onClick={(e) => { e.preventDefault(); payAndConfirm(links[key]); }}>
+              <a key={key} href={links[key]} className="upi-app-btn" style={{ borderColor: color, color, fontSize: 13, textDecoration: "none" }}>
                 {label}
               </a>
             ))}
           </div>
-          <button className="primary wide" onClick={() => payAndConfirm(null)} style={{ fontSize: 16, height: 48 }}>
-            ✓ I've paid — confirm & deduct from fund
+
+          <button className="wide small" onClick={copyUPI} style={{ marginBottom: 12 }}>
+            📋 Copy UPI ID & pay manually
+          </button>
+
+          <details style={{ textAlign: "center", marginBottom: 14 }}>
+            <summary style={{ fontSize: 12, color: "var(--muted)", cursor: "pointer" }}>Or scan QR code</summary>
+            <div style={{ marginTop: 10 }}>
+              <img src={payQr.img} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
+            </div>
+          </details>
+
+          <h2 style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Step 2: After paying, confirm here</h2>
+
+          <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>
+            ✅ Payment done — deduct from fund
           </button>
           <button className="wide small" onClick={() => { setPayQr(null); setWaitingReturn(false); }} style={{ marginTop: 8, color: "var(--muted)" }}>Cancel</button>
-          <p className="hint">Tap a UPI app or scan the QR, then press the button above. {inr(payQr.amount)} will be deducted from the fund.</p>
         </div>
       </>
     );
