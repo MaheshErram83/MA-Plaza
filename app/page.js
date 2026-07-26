@@ -40,14 +40,27 @@ async function makeQR(vpa, name, amount, note) {
 // show an app chooser.
 function appLinks(vpa, name, amount, note) {
   const params = `pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${Math.round(amount)}&cu=INR&tn=${encodeURIComponent(note || "")}`;
-  // Android Intent URLs — Chrome's official method to launch apps.
-  // Falls back to Play Store if app not installed.
   return {
-    any: `intent://pay?${params}#Intent;scheme=upi;end`,
-    gpay: `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.navi;end`,
-    phonepe: `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`,
-    paytm: `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`,
+    // Plain upi:// triggers Android's native app chooser
+    any: `upi://pay?${params}`,
+    // GPay uses tez:// scheme on some devices, intent:// on others
+    gpay: `tez://upi/pay?${params}`,
+    // PhonePe's own scheme
+    phonepe: `phonepe://pay?${params}`,
+    // Paytm's own scheme
+    paytm: `paytmmp://pay?${params}`,
   };
+}
+
+// Try to open UPI — uses multiple fallback methods
+function openUPI(uri) {
+  // Method 1: Create a real link and click it (most trusted by browsers)
+  const a = document.createElement("a");
+  a.href = uri;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 100);
 }
 
 function UpiPayButtons({ vpa, name, amount, note }) {
