@@ -287,37 +287,13 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
         ) : (
           <div style={{ textAlign: "center" }}>
             <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{name(treasurerId)}</b> {inr(amount)}</p>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>UPI: {vpa(treasurerId)}</p>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>Tap the QR to open PhonePe</p>
 
-            {(() => {
-              const links = appLinks(vpa(treasurerId), name(treasurerId), Number(amount), data.house.name + " fund");
-              const apps = [
-                ["any", "🔗 Any UPI", "#8b7cf6"],
-                ["gpay", "💚 GPay", "#2DA94F"],
-                ["phonepe", "💜 PhonePe", "#5F259F"],
-                ["paytm", "💙 Paytm", "#00BAF2"],
-              ];
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-                  {apps.map(([key, label, color]) => (
-                    <a key={key} href={links[key]} className="upi-app-btn" style={{ borderColor: color, color, fontSize: 13, textDecoration: "none" }}>
-                      {label}
-                    </a>
-                  ))}
-                </div>
-              );
-            })()}
+            <a href={`phonepe://pay?pa=${encodeURIComponent(vpa(treasurerId))}&pn=${encodeURIComponent(name(treasurerId))}&am=${Math.round(Number(amount))}&cu=INR&tn=${encodeURIComponent(data.house.name + " fund")}`}>
+              <img src={qr} alt="UPI QR" style={{ borderRadius: 16, background: "#fff", padding: 10, cursor: "pointer", boxShadow: "0 4px 24px rgba(139,124,246,0.3)" }} />
+            </a>
 
-            <button className="wide small" onClick={() => { navigator.clipboard.writeText(vpa(treasurerId)); alert("Copied: " + vpa(treasurerId)); }} style={{ marginBottom: 12 }}>
-              📋 Copy UPI ID & pay manually
-            </button>
-
-            <details style={{ textAlign: "center", marginBottom: 14 }}>
-              <summary style={{ fontSize: 12, color: "var(--muted)", cursor: "pointer" }}>Or scan QR code</summary>
-              <div style={{ marginTop: 10 }}>
-                <img src={qr} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
-              </div>
-            </details>
+            <p style={{ fontSize: 12, color: "var(--muted)", margin: "12px 0", wordBreak: "break-all" }}>{vpa(treasurerId)}</p>
 
             <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>✅ Payment done — add to fund</button>
           </div>
@@ -475,16 +451,8 @@ function Review({ data, name, vpa, onDone }) {
     );
   }
 
-  // ---- PAY SCREEN (QR + app tabs + copy fallback) ----
+  // ---- PAY SCREEN ----
   if (payQr) {
-    const links = appLinks(payQr.vpa, payQr.name, payQr.amount, "Reimbursement");
-    const apps = [
-      ["any", "🔗 Any UPI", "#8b7cf6"],
-      ["gpay", "💚 GPay", "#2DA94F"],
-      ["phonepe", "💜 PhonePe", "#5F259F"],
-      ["paytm", "💙 Paytm", "#00BAF2"],
-    ];
-
     async function confirmPaid() {
       const res = await api("advanceReimbursement", { reimbId: payQr.id, toStatus: "paid", note: "" });
       if (res.ok) {
@@ -497,49 +465,19 @@ function Review({ data, name, vpa, onDone }) {
       }
     }
 
-    function copyUPI() {
-      navigator.clipboard.writeText(payQr.vpa).then(() => alert("UPI ID copied: " + payQr.vpa)).catch(() => {
-        // fallback for older browsers
-        const t = document.createElement("textarea");
-        t.value = payQr.vpa;
-        document.body.appendChild(t);
-        t.select();
-        document.execCommand("copy");
-        document.body.removeChild(t);
-        alert("UPI ID copied: " + payQr.vpa);
-      });
-    }
-
     return (
       <>
         <Header icon="💸" title="Pay reimbursement" sub={"Pay " + payQr.name} />
         <div className="card" style={{ textAlign: "center" }}>
           <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{payQr.name}</b></p>
           <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 4 }}>{inr(payQr.amount)}</div>
-          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>UPI: {payQr.vpa}</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>Tap the QR to open PhonePe</p>
 
-          <h2 style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Step 1: Pay using any method</h2>
+          <a href={`phonepe://pay?pa=${encodeURIComponent(payQr.vpa)}&pn=${encodeURIComponent(payQr.name)}&am=${Math.round(payQr.amount)}&cu=INR&tn=Reimbursement`}>
+            <img src={payQr.img} alt="UPI QR" style={{ borderRadius: 16, background: "#fff", padding: 10, cursor: "pointer", boxShadow: "0 4px 24px rgba(139,124,246,0.3)" }} />
+          </a>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            {apps.map(([key, label, color]) => (
-              <a key={key} href={links[key]} className="upi-app-btn" style={{ borderColor: color, color, fontSize: 13, textDecoration: "none" }}>
-                {label}
-              </a>
-            ))}
-          </div>
-
-          <button className="wide small" onClick={copyUPI} style={{ marginBottom: 12 }}>
-            📋 Copy UPI ID & pay manually
-          </button>
-
-          <details style={{ textAlign: "center", marginBottom: 14 }}>
-            <summary style={{ fontSize: 12, color: "var(--muted)", cursor: "pointer" }}>Or scan QR code</summary>
-            <div style={{ marginTop: 10 }}>
-              <img src={payQr.img} alt="UPI QR" style={{ borderRadius: 12, background: "#fff", padding: 8 }} />
-            </div>
-          </details>
-
-          <h2 style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>Step 2: After paying, confirm here</h2>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: "12px 0", wordBreak: "break-all" }}>{payQr.vpa}</p>
 
           <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>
             ✅ Payment done — deduct from fund
