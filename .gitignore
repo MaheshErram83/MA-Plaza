@@ -1,0 +1,5 @@
+node_modules/
+.next/
+roommate.db
+roommate.db-wal
+roommate.db-shm
