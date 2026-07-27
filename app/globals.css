@@ -108,3 +108,4 @@ button.small{height:36px;padding:0 14px;font-size:13px}
 .upi-app-btn:active{transform:scale(.97)}
 @keyframes popIn{0%{opacity:0;transform:scale(.5)}60%{transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
 .pay-success-icon{animation:popIn .5s ease both}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}

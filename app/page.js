@@ -77,6 +77,11 @@ export default function App() {
     return d;
   }
   useEffect(() => { refresh(); }, []);
+  // Auto-refresh every 10 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => { refresh(); }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) return <div className="wrap"><p style={{ padding: 40, color: "var(--muted)" }}>Loading…</p></div>;
   if (!data.house) return <Setup onDone={refresh} />;
@@ -189,6 +194,12 @@ function Dashboard({ data, name, setTab }) {
   return (
     <>
       <Header icon="🏦" title={data.house.name} sub={"Treasurer: " + (config.treasurer_id ? name(config.treasurer_id) : "—")} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: -8, marginBottom: 8 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--green)" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)", animation: "pulse 2s infinite" }} />
+          Live
+        </span>
+      </div>
 
       <div className="hero">
         <div className="label">House fund available</div>
