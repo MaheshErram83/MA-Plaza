@@ -225,12 +225,6 @@ function Dashboard({ data, name, setTab }) {
         </div>
       )}
 
-      <div className="stat-grid">
-        <div className="stat" onClick={() => setTab("contribute")} style={{ cursor: "pointer" }}><div className="label">Money in</div><div className="value" style={{ fontSize: 15 }}>💰 Add</div></div>
-        <div className="stat" onClick={() => setTab("requests")} style={{ cursor: "pointer" }}><div className="label">Claim back</div><div className="value" style={{ fontSize: 15 }}>🧾 Request</div></div>
-        <div className="stat" onClick={() => setTab("requests")} style={{ cursor: "pointer" }}><div className="label">Treasurer</div><div className="value" style={{ fontSize: 15 }}>✓ Review</div></div>
-      </div>
-
       <div className="card">
         <div className="card-head"><h2>Active reimbursements</h2>
           <button className="small" onClick={() => setTab("requests")}>See all</button>
