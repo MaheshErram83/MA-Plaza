@@ -1,4 +1,4 @@
-import "./globals.css";
+﻿import "./globals.css";
 
 export const metadata = {
   title: "MA Plaza",
@@ -27,7 +27,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/app-icon-192.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d0d12" />
       </head>
