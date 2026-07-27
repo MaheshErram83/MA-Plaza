@@ -47,6 +47,27 @@ export default function App() {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+
+  // Capture the install prompt
+  useEffect(() => {
+    function onPrompt(e) {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstall(true);
+    }
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+
+  async function installApp() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === "accepted") setShowInstall(false);
+    setInstallPrompt(null);
+  }
 
   async function refresh() {
     const res = await fetch("/api/house");
@@ -71,6 +92,18 @@ export default function App() {
       {tab === "request" && <RequestReimb data={data} onDone={() => { refresh(); setTab("dashboard"); }} />}
       {tab === "review" && <Review data={data} name={name} vpa={vpa} onDone={refresh} />}
       {tab === "settings" && <Settings data={data} name={name} setTab={setTab} />}
+      {showInstall && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999, padding: "12px 16px", background: "linear-gradient(135deg, var(--accent), var(--accent-2))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/icon-192.png" alt="MA Plaza" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <div><div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>Install MA Plaza</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Add to home screen</div></div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={installApp} style={{ height: 34, padding: "0 16px", background: "#fff", color: "var(--accent-2)", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Install</button>
+            <button onClick={() => setShowInstall(false)} style={{ height: 34, padding: "0 10px", background: "transparent", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>✕</button>
+          </div>
+        </div>
+      )}
       <TreasBar tab={tab} setTab={setTab} pending={pendingCount(data)} />
     </div>
   );
