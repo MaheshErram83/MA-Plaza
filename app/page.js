@@ -89,8 +89,7 @@ export default function App() {
     <div className="wrap">
       {tab === "dashboard" && <Dashboard data={data} name={name} setTab={setTab} />}
       {tab === "contribute" && <Contribute data={data} name={name} vpa={vpa} treasurerId={treasurerId} onDone={refresh} />}
-      {tab === "request" && <RequestReimb data={data} onDone={() => { refresh(); setTab("dashboard"); }} />}
-      {tab === "review" && <Review data={data} name={name} vpa={vpa} onDone={refresh} />}
+      {tab === "requests" && <Requests data={data} name={name} vpa={vpa} onDone={refresh} />}
       {tab === "settings" && <Settings data={data} name={name} setTab={setTab} />}
       {tab === "chat" && <Chat data={data} name={name} onDone={refresh} />}
       {showInstall && (
@@ -217,13 +216,13 @@ function Dashboard({ data, name, setTab }) {
 
       <div className="stat-grid">
         <div className="stat" onClick={() => setTab("contribute")} style={{ cursor: "pointer" }}><div className="label">Money in</div><div className="value" style={{ fontSize: 15 }}>💰 Add</div></div>
-        <div className="stat" onClick={() => setTab("request")} style={{ cursor: "pointer" }}><div className="label">Claim back</div><div className="value" style={{ fontSize: 15 }}>🧾 Request</div></div>
-        <div className="stat" onClick={() => setTab("review")} style={{ cursor: "pointer" }}><div className="label">Treasurer</div><div className="value" style={{ fontSize: 15 }}>✓ Review</div></div>
+        <div className="stat" onClick={() => setTab("requests")} style={{ cursor: "pointer" }}><div className="label">Claim back</div><div className="value" style={{ fontSize: 15 }}>🧾 Request</div></div>
+        <div className="stat" onClick={() => setTab("requests")} style={{ cursor: "pointer" }}><div className="label">Treasurer</div><div className="value" style={{ fontSize: 15 }}>✓ Review</div></div>
       </div>
 
       <div className="card">
         <div className="card-head"><h2>Active reimbursements</h2>
-          <button className="small" onClick={() => setTab("review")}>See all</button>
+          <button className="small" onClick={() => setTab("requests")}>See all</button>
         </div>
         {activeReimb.length ? activeReimb.slice(0, 4).map((r) => {
           const meta = STATUS_META[r.status];
@@ -333,7 +332,30 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
   );
 }
 
-function RequestReimb({ data, onDone }) {
+function Requests({ data, name, vpa, onDone }) {
+  const [subTab, setSubTab] = useState("review");
+  const pendingCount = (data.reimbursements || []).filter(r => r.status === "submitted" || r.status === "under_review" || r.status === "approved").length;
+
+  return (
+    <>
+      <Header icon="🧾" title="Requests" sub="Claim & review reimbursements" />
+      <div className="card" style={{ padding: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+          <button onClick={() => setSubTab("claim")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "claim" ? "var(--accent)" : "transparent", color: subTab === "claim" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            🧾 New claim
+          </button>
+          <button onClick={() => setSubTab("review")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "review" ? "var(--accent)" : "transparent", color: subTab === "review" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer", position: "relative" }}>
+            ✓ Review {pendingCount > 0 && <span style={{ background: "var(--amber)", color: "#fff", fontSize: 10, borderRadius: 8, padding: "1px 6px", marginLeft: 4 }}>{pendingCount}</span>}
+          </button>
+        </div>
+      </div>
+      {subTab === "claim" && <RequestReimbInner data={data} onDone={onDone} />}
+      {subTab === "review" && <ReviewInner data={data} name={name} vpa={vpa} onDone={onDone} />}
+    </>
+  );
+}
+
+function RequestReimbInner({ data, onDone }) {
   const [member, setMember] = useState(data.members[0].id);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Groceries");
@@ -360,7 +382,7 @@ function RequestReimb({ data, onDone }) {
 
   return (
     <>
-      <Header icon="🧾" title="Request reimbursement" sub="You paid — claim it back from the fund" />
+      
       <div className="card">
         <label>Who paid?</label>
         <select value={member} onChange={(e) => setMember(e.target.value)} style={{ marginBottom: 4 }}>
@@ -391,7 +413,7 @@ function RequestReimb({ data, onDone }) {
   );
 }
 
-function Review({ data, name, vpa, onDone }) {
+function ReviewInner({ data, name, vpa, onDone }) {
   const reimb = data.reimbursements || [];
   const [note, setNote] = useState({});
   const [payQr, setPayQr] = useState(null);
@@ -542,7 +564,7 @@ function Review({ data, name, vpa, onDone }) {
 
   return (
     <>
-      <Header icon="✓" title="Review queue" sub="Approve, reject, and pay" />
+      
       {active.length ? active.map((r) => {
         const meta = STATUS_META[r.status];
         return (
@@ -1101,8 +1123,8 @@ function TreasBar({ tab, setTab, pending }) {
   const tabs = [
     ["dashboard", "🏦", "Fund"],
     ["contribute", "💰", "Add"],
+    ["requests", "🧾", "Requests"],
     ["chat", "💬", "Chat"],
-    ["review", "✓", "Review"],
     ["settings", "⚙️", "More"],
   ];
   return (
