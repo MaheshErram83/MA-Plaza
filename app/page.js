@@ -92,6 +92,7 @@ export default function App() {
       {tab === "request" && <RequestReimb data={data} onDone={() => { refresh(); setTab("dashboard"); }} />}
       {tab === "review" && <Review data={data} name={name} vpa={vpa} onDone={refresh} />}
       {tab === "settings" && <Settings data={data} name={name} setTab={setTab} />}
+      {tab === "chat" && <Chat data={data} name={name} onDone={refresh} />}
       {showInstall && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999, padding: "12px 16px", background: "linear-gradient(135deg, var(--accent), var(--accent-2))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -982,6 +983,107 @@ function SettingsReports({ data, name }) {
   );
 }
 
+function Chat({ data, name, onDone }) {
+  const [text, setText] = useState("");
+  const [sender, setSender] = useState(data.members[0]?.id || "");
+  const [refreshing, setRefreshing] = useState(false);
+  const messages = [...(data.messages || [])].reverse();
+
+  async function send() {
+    if (!text.trim()) return;
+    await api("sendMessage", { memberId: sender, text: text.trim() });
+    setText("");
+    onDone();
+  }
+
+  async function refreshChat() {
+    setRefreshing(true);
+    await onDone();
+    setRefreshing(false);
+  }
+
+  // Auto-refresh every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => { onDone(); }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const senderName = name(sender);
+
+  // Group messages by date
+  function dateLabel(ts) {
+    const d = new Date(Number(ts));
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return "Today";
+    const yesterday = new Date(today - 86400000);
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  }
+
+  function timeLabel(ts) {
+    return new Date(Number(ts)).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  let lastDate = "";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 4px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="logo">💬</div>
+          <div><h1 style={{ fontSize: 18 }}>House chat</h1><div className="sub">{data.members.length} members</div></div>
+        </div>
+        <button className="small" onClick={refreshChat} style={{ fontSize: 18, border: "none", background: "none", color: "var(--muted)" }}>{refreshing ? "⏳" : "🔄"}</button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 4px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+        {messages.length === 0 && <div className="empty" style={{ marginTop: 40 }}>No messages yet. Say hello to your roommates!</div>}
+        {messages.map((m, i) => {
+          const isMe = m.member_id === sender;
+          const showDate = dateLabel(m.created_at) !== lastDate;
+          lastDate = dateLabel(m.created_at);
+          return (
+            <div key={m.id || i}>
+              {showDate && (
+                <div style={{ textAlign: "center", margin: "12px 0 8px" }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--card-2)", padding: "4px 12px", borderRadius: 12 }}>{dateLabel(m.created_at)}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 2 }}>
+                <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+                  {!isMe && <span style={{ fontSize: 11, color: "var(--accent)", marginBottom: 2, marginLeft: 10 }}>{name(m.member_id)}</span>}
+                  <div style={{
+                    background: isMe ? "linear-gradient(135deg, var(--accent), var(--accent-2))" : "var(--card-2)",
+                    color: isMe ? "#fff" : "var(--ink)",
+                    padding: "10px 14px",
+                    borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    wordBreak: "break-word",
+                  }}>
+                    {m.text}
+                  </div>
+                  <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, marginRight: isMe ? 4 : 0, marginLeft: isMe ? 0 : 4 }}>{timeLabel(m.created_at)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: "8px 0 4px", borderTop: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+          <select value={sender} onChange={(e) => setSender(e.target.value)} style={{ flex: "0 0 auto", width: 100, fontSize: 12, height: 40 }}>
+            {data.members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <input value={text} placeholder={"Message as " + senderName + "..."} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} style={{ flex: 1, height: 40 }} />
+          <button className="primary" onClick={send} style={{ flex: "0 0 auto", height: 40, width: 44, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>➤</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Feed({ feed, limit }) {
   const items = limit ? (feed || []).slice(0, limit) : (feed || []);
   const icon = (t) => t === "contribution" ? "💰" : t === "reimbursement" ? "🧾" : t === "expense" ? "💸" : t === "config" ? "⚙️" : "🏦";
@@ -999,9 +1101,9 @@ function TreasBar({ tab, setTab, pending }) {
   const tabs = [
     ["dashboard", "🏦", "Fund"],
     ["contribute", "💰", "Add"],
-    ["request", "🧾", "Claim"],
+    ["chat", "💬", "Chat"],
     ["review", "✓", "Review"],
-    ["settings", "⚙️", "Settings"],
+    ["settings", "⚙️", "More"],
   ];
   return (
     <div className="tabbar">

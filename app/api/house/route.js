@@ -3,7 +3,7 @@ import * as store from "../../../lib/store";
 
 let dbReady = false;
 async function ensureDB() {
-  if (!dbReady) { await store.initDB(); dbReady = true; }
+  if (!dbReady) { await store.initDB(); await store.initChat(); dbReady = true; }
 }
 
 export async function GET() {
@@ -20,8 +20,9 @@ export async function GET() {
     store.getFundExpenses(id),
     store.getReimbursements(id),
     store.fundInsights(id),
+    store.getMessages(id),
   ]);
-  return NextResponse.json({ house, members, feed, config, fund, contributions, fundExpenses, reimbursements, fundInsights });
+  return NextResponse.json({ house, members, feed, config, fund, contributions, fundExpenses, reimbursements, fundInsights, messages });
 }
 
 export async function POST(req) {
@@ -46,6 +47,7 @@ export async function POST(req) {
   if (action === "addFundExpense") { await store.addFundExpense(id, body.expense); return NextResponse.json({ ok: true }); }
   if (action === "createReimbursement") { await store.createReimbursement(id, body.reimbursement); return NextResponse.json({ ok: true }); }
   if (action === "advanceReimbursement") { return NextResponse.json(await store.advanceReimbursement(id, body.reimbId, body.toStatus, body.note, body.proof)); }
+  if (action === "sendMessage") { await store.sendMessage(id, body.memberId, body.text); return NextResponse.json({ ok: true }); }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });
 }

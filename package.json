@@ -2,12 +2,16 @@
   "name": "house-treasurer",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "dependencies": {
     "next": "14.2.35",
+    "pg": "^8.13.1",
+    "qrcode": "1.5.3",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "pg": "8.13.1",
-    "qrcode": "1.5.3"
+    "react-dom": "18.3.1"
   }
 }
