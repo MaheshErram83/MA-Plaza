@@ -216,19 +216,28 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
   const [member, setMember] = useState(data.members[0].id);
   const [amount, setAmount] = useState(data.config?.monthly_amount || "");
   const [qr, setQr] = useState(null);
+  const [proof, setProof] = useState("");
   const contribs = data.contributions || [];
 
   const thisMonth = {};
   contribs.forEach((c) => { thisMonth[c.member_id] = (thisMonth[c.member_id] || 0) + c.amount; });
 
+  function onProof(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setProof(reader.result);
+    reader.readAsDataURL(f);
+  }
   async function showPay() {
     if (!Number(amount)) return alert("Enter an amount");
     const img = await makeQR(vpa(treasurerId), name(treasurerId), Number(amount), data.house.name + " fund");
     setQr(img);
   }
   async function confirmPaid() {
-    await api("addContribution", { memberId: member, amount: Number(amount) });
-    setQr(null);
+    if (!proof) return alert("Upload a screenshot of your payment as proof");
+    await api("addContribution", { memberId: member, amount: Number(amount), proof });
+    setQr(null); setProof("");
     onDone();
   }
 
@@ -262,6 +271,13 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
               <button className="wide small" onClick={() => { navigator.clipboard.writeText(vpa(treasurerId)); alert("Copied: " + vpa(treasurerId) + "\n\nNow open PhonePe → Send money → Paste UPI ID → Enter " + inr(amount)); }} style={{ background: "var(--accent-bg)", color: "var(--accent)", borderColor: "rgba(139,124,246,0.3)" }}>
                 📋 Copy UPI ID
               </button>
+            </div>
+
+            <div style={{ background: "var(--card-2)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📸 Upload payment screenshot</p>
+              <input type="file" accept="image/*" onChange={onProof} style={{ marginBottom: 8, padding: "10px 12px", height: "auto", width: "100%" }} />
+              {proof && <img src={proof} alt="proof" style={{ width: "100%", borderRadius: 10, maxHeight: 200, objectFit: "cover" }} />}
+              {!proof && <p style={{ fontSize: 12, color: "var(--muted)" }}>Take a screenshot of PhonePe success screen and upload it</p>}
             </div>
 
             <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>✅ Payment done — add to fund</button>
@@ -347,6 +363,15 @@ function Review({ data, name, vpa, onDone }) {
   const [payQr, setPayQr] = useState(null);
   const [paySuccess, setPaySuccess] = useState(null);
   const [waitingReturn, setWaitingReturn] = useState(false);
+  const [payProof, setPayProof] = useState("");
+
+  function onPayProof(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setPayProof(reader.result);
+    reader.readAsDataURL(f);
+  }
 
   async function advance(r, toStatus) {
     const res = await api("advanceReimbursement", { reimbId: r.id, toStatus, note: note[r.id] || "" });
@@ -423,10 +448,11 @@ function Review({ data, name, vpa, onDone }) {
   // ---- PAY SCREEN ----
   if (payQr) {
     async function confirmPaid() {
-      const res = await api("advanceReimbursement", { reimbId: payQr.id, toStatus: "paid", note: "" });
+      if (!payProof) return alert("Upload a screenshot of your payment as proof");
+      const res = await api("advanceReimbursement", { reimbId: payQr.id, toStatus: "paid", note: "", proof: payProof });
       if (res.ok) {
         setPaySuccess({ name: payQr.name, amount: payQr.amount });
-        setPayQr(null);
+        setPayQr(null); setPayProof("");
         setWaitingReturn(false);
         setTimeout(() => { setPaySuccess(null); onDone(); }, 3000);
       } else {
@@ -453,6 +479,13 @@ function Review({ data, name, vpa, onDone }) {
             <button className="wide small" onClick={() => { navigator.clipboard.writeText(payQr.vpa); alert("Copied: " + payQr.vpa + "\n\nNow open PhonePe → Send money → Paste UPI ID → Enter " + inr(payQr.amount)); }} style={{ background: "var(--accent-bg)", color: "var(--accent)", borderColor: "rgba(139,124,246,0.3)" }}>
               📋 Copy UPI ID
             </button>
+          </div>
+
+          <div style={{ background: "var(--card-2)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📸 Upload payment screenshot</p>
+            <input type="file" accept="image/*" onChange={onPayProof} style={{ marginBottom: 8, padding: "10px 12px", height: "auto", width: "100%" }} />
+            {payProof && <img src={payProof} alt="proof" style={{ width: "100%", borderRadius: 10, maxHeight: 200, objectFit: "cover" }} />}
+            {!payProof && <p style={{ fontSize: 12, color: "var(--muted)" }}>Take a screenshot of PhonePe success screen and upload it</p>}
           </div>
 
           <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>
