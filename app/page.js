@@ -71,6 +71,8 @@ export default function App() {
       {tab === "request" && <RequestReimb data={data} onDone={() => { refresh(); setTab("dashboard"); }} />}
       {tab === "review" && <Review data={data} name={name} vpa={vpa} onDone={refresh} />}
       {tab === "members" && <Members data={data} onDone={refresh} />}
+      {tab === "settings" && <Settings data={data} name={name} setTab={setTab} />}
+      {tab === "history" && <FullHistory data={data} name={name} />}
       <TreasBar tab={tab} setTab={setTab} pending={pendingCount(data)} />
     </div>
   );
@@ -208,6 +210,7 @@ function Dashboard({ data, name, setTab }) {
       </div>
 
       <div className="card"><h2>Recent activity</h2><Feed feed={data.feed} limit={6} /></div>
+      <button className="wide" onClick={() => setTab("settings")} style={{ marginBottom: 14 }}>⚙️ Settings & History</button>
     </>
   );
 }
@@ -645,6 +648,124 @@ function Members({ data, onDone }) {
           <div style={{ flex: 1 }}><label>Category</label><select value={expCat} onChange={(e) => setExpCat(e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
         </div>
         <button className="primary wide" onClick={addFundExpense} style={{ marginTop: 4 }}>Record expense</button>
+      </div>
+    </>
+  );
+}
+
+function Settings({ data, name, setTab }) {
+  const config = data.config || {};
+  const fund = data.fund || {};
+  const contribs = (data.contributions || []).map(c => ({ ...c, type: "contribution", ts: Number(c.created_at) }));
+  const reimbs = (data.reimbursements || []).map(r => ({ ...r, type: "reimbursement", ts: Number(r.created_at) }));
+  const expenses = (data.fundExpenses || []).map(e => ({ ...e, type: "expense", ts: Number(e.created_at) }));
+  const all = [...contribs, ...reimbs, ...expenses].sort((a, b) => b.ts - a.ts);
+
+  const totalProofs = contribs.filter(c => c.proof).length + reimbs.filter(r => r.payment_proof || r.receipt).length;
+
+  const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+
+  const filtered = filter === "all" ? all : all.filter(r => r.type === filter);
+  const statusColor = (s) => STATUS_META[s]?.color || "var(--muted)";
+  const statusLabel = (s) => STATUS_META[s]?.label || s;
+
+  return (
+    <>
+      <Header icon="⚙️" title="Settings & History" sub="Everything stored safely" />
+
+      <div className="card">
+        <h2>Fund configuration</h2>
+        <div className="mrow"><span>Treasurer</span><span style={{ fontWeight: 600 }}>{config.treasurer_id ? name(config.treasurer_id) + " 👑" : "Not set"}</span></div>
+        <div className="mrow"><span>Monthly per person</span><span style={{ fontWeight: 600 }}>{inr(config.monthly_amount)}</span></div>
+        <div className="mrow"><span>Available fund</span><span style={{ fontWeight: 600, color: "var(--green)" }}>{inr(fund.available)}</span></div>
+        <div className="mrow"><span>Total in</span><span>{inr(fund.totalIn)}</span></div>
+        <div className="mrow"><span>Total out</span><span>{inr(fund.totalOut)}</span></div>
+      </div>
+
+      <div className="card">
+        <h2>📊 Storage</h2>
+        <div className="mrow"><span>Contributions</span><span>{contribs.length}</span></div>
+        <div className="mrow"><span>Reimbursements</span><span>{reimbs.length}</span></div>
+        <div className="mrow"><span>Fund expenses</span><span>{expenses.length}</span></div>
+        <div className="mrow"><span>Payment proofs</span><span style={{ color: "var(--green)" }}>{totalProofs}</span></div>
+        <div className="mrow bold"><span>Total records</span><span>{all.length}</span></div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><h2>📜 Full history</h2><span className="tag">{all.length} records</span></div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" }}>
+          {[["all", "All"], ["contribution", "💰 In"], ["reimbursement", "🧾 Claims"], ["expense", "💸 Out"]].map(([key, label]) => (
+            <button key={key} className={"small" + (filter === key ? " primary" : "")} onClick={() => setFilter(key)} style={{ whiteSpace: "nowrap", fontSize: 12 }}>{label}</button>
+          ))}
+        </div>
+
+        {filtered.length === 0 && <div className="empty">No records yet.</div>}
+
+        {filtered.map((r, i) => (
+          <div key={r.id || i} style={{ borderBottom: "1px solid var(--line-soft)" }}>
+            <div className="bal-row" onClick={() => setExpanded(expanded === i ? null : i)} style={{ cursor: "pointer" }}>
+              <div className="bal-left">
+                <span style={{ fontSize: 18 }}>{r.type === "contribution" ? "💰" : r.type === "reimbursement" ? "🧾" : "💸"}</span>
+                <div className="bal-text">
+                  <b>{r.type === "contribution" ? name(r.member_id) : r.type === "reimbursement" ? name(r.member_id) : (r.description || "Expense")}</b>
+                  <div className="sub">{fmtDate(r.ts)} · {r.type === "contribution" ? "Contribution" : r.type === "reimbursement" ? (r.description || r.category) : r.category}</div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="bal-amt">{inr(r.amount)}</div>
+                <div style={{ fontSize: 11, color: r.type === "contribution" ? "var(--green)" : r.type === "expense" ? "var(--amber)" : statusColor(r.status) }}>
+                  {r.type === "contribution" ? "Fund +" : r.type === "expense" ? "Fund −" : statusLabel(r.status)}
+                </div>
+              </div>
+            </div>
+
+            {expanded === i && (
+              <div style={{ padding: "0 12px 14px", background: "var(--card-2)", borderRadius: "0 0 10px 10px", margin: "0 -2px" }}>
+                {r.type === "contribution" && (
+                  <>
+                    <div className="mrow"><span>Member</span><span>{name(r.member_id)}</span></div>
+                    <div className="mrow"><span>Month</span><span>{r.month_tag}</span></div>
+                    {r.proof ? (
+                      <div style={{ marginTop: 10 }}>
+                        <p style={{ fontSize: 12, color: "var(--green)", marginBottom: 6 }}>📸 Payment proof ✓</p>
+                        <img src={r.proof} alt="proof" style={{ width: "100%", borderRadius: 10, maxHeight: 300, objectFit: "contain" }} />
+                      </div>
+                    ) : <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>No proof attached</p>}
+                  </>
+                )}
+                {r.type === "reimbursement" && (
+                  <>
+                    <div className="mrow"><span>Requested by</span><span>{name(r.member_id)}</span></div>
+                    <div className="mrow"><span>Category</span><span>{r.category}</span></div>
+                    <div className="mrow"><span>Status</span><span style={{ color: statusColor(r.status) }}>{statusLabel(r.status)}</span></div>
+                    {r.notes && <div className="mrow"><span>Notes</span><span>{r.notes}</span></div>}
+                    {r.treasurer_note && <div className="mrow"><span>Treasurer note</span><span>{r.treasurer_note}</span></div>}
+                    {r.receipt && (
+                      <div style={{ marginTop: 10 }}>
+                        <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>🧾 Receipt:</p>
+                        <img src={r.receipt} alt="receipt" style={{ width: "100%", borderRadius: 10, maxHeight: 300, objectFit: "contain" }} />
+                      </div>
+                    )}
+                    {r.payment_proof && (
+                      <div style={{ marginTop: 10 }}>
+                        <p style={{ fontSize: 12, color: "var(--green)", marginBottom: 6 }}>📸 Payment proof ✓</p>
+                        <img src={r.payment_proof} alt="payment proof" style={{ width: "100%", borderRadius: 10, maxHeight: 300, objectFit: "contain" }} />
+                      </div>
+                    )}
+                  </>
+                )}
+                {r.type === "expense" && (
+                  <>
+                    <div className="mrow"><span>Category</span><span>{r.category}</span></div>
+                    {r.paid_by && <div className="mrow"><span>Paid by</span><span>{name(r.paid_by)}</span></div>}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </>
   );
