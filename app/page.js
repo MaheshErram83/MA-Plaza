@@ -70,9 +70,7 @@ export default function App() {
       {tab === "contribute" && <Contribute data={data} name={name} vpa={vpa} treasurerId={treasurerId} onDone={refresh} />}
       {tab === "request" && <RequestReimb data={data} onDone={() => { refresh(); setTab("dashboard"); }} />}
       {tab === "review" && <Review data={data} name={name} vpa={vpa} onDone={refresh} />}
-      {tab === "members" && <Members data={data} onDone={refresh} />}
       {tab === "settings" && <Settings data={data} name={name} setTab={setTab} />}
-      {tab === "history" && <FullHistory data={data} name={name} />}
       <TreasBar tab={tab} setTab={setTab} pending={pendingCount(data)} />
     </div>
   );
@@ -210,7 +208,6 @@ function Dashboard({ data, name, setTab }) {
       </div>
 
       <div className="card"><h2>Recent activity</h2><Feed feed={data.feed} limit={6} /></div>
-      <button className="wide" onClick={() => setTab("settings")} style={{ marginBottom: 14 }}>⚙️ Settings & History</button>
     </>
   );
 }
@@ -556,8 +553,33 @@ function Review({ data, name, vpa, onDone }) {
   );
 }
 
-function Members({ data, onDone }) {
+function Settings({ data, name, setTab }) {
   const config = data.config || {};
+  const fund = data.fund || {};
+  const [subTab, setSubTab] = useState("members");
+
+  return (
+    <>
+      <Header icon="⚙️" title="Settings" sub={data.house.name} />
+
+      <div className="card" style={{ padding: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+          <button onClick={() => setSubTab("members")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "members" ? "var(--accent)" : "transparent", color: subTab === "members" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            👥 Members
+          </button>
+          <button onClick={() => setSubTab("history")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "history" ? "var(--accent)" : "transparent", color: subTab === "history" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            📜 History
+          </button>
+        </div>
+      </div>
+
+      {subTab === "members" && <SettingsMembers data={data} name={name} config={config} fund={fund} />}
+      {subTab === "history" && <SettingsHistory data={data} name={name} />}
+    </>
+  );
+}
+
+function SettingsMembers({ data, name, config, fund }) {
   const [newName, setNewName] = useState("");
   const [newVpa, setNewVpa] = useState("");
   const [editing, setEditing] = useState(null);
@@ -566,6 +588,8 @@ function Members({ data, onDone }) {
   const [expDesc, setExpDesc] = useState("");
   const [expAmt, setExpAmt] = useState("");
   const [expCat, setExpCat] = useState("Utilities");
+
+  async function onDone() { window.location.reload(); }
 
   async function add() {
     if (!newName.trim()) return alert("Enter a name");
@@ -595,15 +619,13 @@ function Members({ data, onDone }) {
 
   return (
     <>
-      <Header icon="👥" title="Members" sub={`${data.members.length} in the house`} />
-
       <div className="card">
-        <h2>Add a member</h2>
-        <label>Name</label>
-        <input value={newName} placeholder="New member" onChange={(e) => setNewName(e.target.value)} style={{ marginBottom: 12 }} />
-        <label>UPI ID (to receive reimbursements)</label>
-        <input value={newVpa} placeholder="name@upi" onChange={(e) => setNewVpa(e.target.value)} style={{ marginBottom: 14 }} />
-        <button className="primary wide" onClick={add}>Add member</button>
+        <h2>Fund configuration</h2>
+        <div className="mrow"><span>Treasurer</span><span style={{ fontWeight: 600 }}>{config.treasurer_id ? name(config.treasurer_id) + " 👑" : "Not set"}</span></div>
+        <div className="mrow"><span>Monthly per person</span><span style={{ fontWeight: 600 }}>{inr(config.monthly_amount)}</span></div>
+        <div className="mrow"><span>Available fund</span><span style={{ fontWeight: 600, color: "var(--green)" }}>{inr(fund.available)}</span></div>
+        <div className="mrow"><span>Total in</span><span>{inr(fund.totalIn)}</span></div>
+        <div className="mrow"><span>Total out</span><span>{inr(fund.totalOut)}</span></div>
       </div>
 
       <div className="card">
@@ -625,7 +647,7 @@ function Members({ data, onDone }) {
               <div className="bal-row">
                 <div className="bal-left">
                   <Avatar name={m.name} />
-                  <div className="bal-text"><b>{m.name}{m.id === config.treasurer_id ? " 👑 treasurer" : ""}</b><div className="sub">{m.vpa}</div></div>
+                  <div className="bal-text"><b>{m.name}{m.id === config.treasurer_id ? " 👑" : ""}</b><div className="sub">{m.vpa}</div></div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button className="small" onClick={() => startEdit(m)}>Edit</button>
@@ -635,12 +657,20 @@ function Members({ data, onDone }) {
             )}
           </div>
         ))}
-        <p className="hint">The treasurer 👑 receives all contributions and pays reimbursements. Set each member's real UPI ID so QR codes work.</p>
       </div>
 
       <div className="card">
-        <h2>Record a fund expense</h2>
-        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>Money the treasurer spent directly from the fund (electricity, water). Deducts from the total.</p>
+        <h2>Add a member</h2>
+        <label>Name</label>
+        <input value={newName} placeholder="New member" onChange={(e) => setNewName(e.target.value)} style={{ marginBottom: 12 }} />
+        <label>UPI ID</label>
+        <input value={newVpa} placeholder="name@upi" onChange={(e) => setNewVpa(e.target.value)} style={{ marginBottom: 14 }} />
+        <button className="primary wide" onClick={add}>Add member</button>
+      </div>
+
+      <div className="card">
+        <h2>Record fund expense</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>Money the treasurer spent directly (electricity, water).</p>
         <label>Description</label>
         <input value={expDesc} placeholder="Electricity bill" onChange={(e) => setExpDesc(e.target.value)} style={{ marginBottom: 12 }} />
         <div className="row">
@@ -653,14 +683,11 @@ function Members({ data, onDone }) {
   );
 }
 
-function Settings({ data, name, setTab }) {
-  const config = data.config || {};
-  const fund = data.fund || {};
+function SettingsHistory({ data, name }) {
   const contribs = (data.contributions || []).map(c => ({ ...c, type: "contribution", ts: Number(c.created_at) }));
   const reimbs = (data.reimbursements || []).map(r => ({ ...r, type: "reimbursement", ts: Number(r.created_at) }));
   const expenses = (data.fundExpenses || []).map(e => ({ ...e, type: "expense", ts: Number(e.created_at) }));
   const all = [...contribs, ...reimbs, ...expenses].sort((a, b) => b.ts - a.ts);
-
   const totalProofs = contribs.filter(c => c.proof).length + reimbs.filter(r => r.payment_proof || r.receipt).length;
 
   const [filter, setFilter] = useState("all");
@@ -672,17 +699,6 @@ function Settings({ data, name, setTab }) {
 
   return (
     <>
-      <Header icon="⚙️" title="Settings & History" sub="Everything stored safely" />
-
-      <div className="card">
-        <h2>Fund configuration</h2>
-        <div className="mrow"><span>Treasurer</span><span style={{ fontWeight: 600 }}>{config.treasurer_id ? name(config.treasurer_id) + " 👑" : "Not set"}</span></div>
-        <div className="mrow"><span>Monthly per person</span><span style={{ fontWeight: 600 }}>{inr(config.monthly_amount)}</span></div>
-        <div className="mrow"><span>Available fund</span><span style={{ fontWeight: 600, color: "var(--green)" }}>{inr(fund.available)}</span></div>
-        <div className="mrow"><span>Total in</span><span>{inr(fund.totalIn)}</span></div>
-        <div className="mrow"><span>Total out</span><span>{inr(fund.totalOut)}</span></div>
-      </div>
-
       <div className="card">
         <h2>📊 Storage</h2>
         <div className="mrow"><span>Contributions</span><span>{contribs.length}</span></div>
@@ -693,7 +709,7 @@ function Settings({ data, name, setTab }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><h2>📜 Full history</h2><span className="tag">{all.length} records</span></div>
+        <div className="card-head"><h2>📜 All transactions</h2><span className="tag">{all.length} records</span></div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" }}>
           {[["all", "All"], ["contribution", "💰 In"], ["reimbursement", "🧾 Claims"], ["expense", "💸 Out"]].map(([key, label]) => (
@@ -790,7 +806,7 @@ function TreasBar({ tab, setTab, pending }) {
     ["contribute", "💰", "Add"],
     ["request", "🧾", "Claim"],
     ["review", "✓", "Review"],
-    ["members", "👥", "Members"],
+    ["settings", "⚙️", "Settings"],
   ];
   return (
     <div className="tabbar">
