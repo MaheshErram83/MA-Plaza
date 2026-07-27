@@ -38,48 +38,9 @@ async function makeQR(vpa, name, amount, note) {
 // UPI apps register their own URL schemes. These open a specific app
 // with the payment pre-filled; the generic upi:// link lets the phone
 // show an app chooser.
-function appLinks(vpa, name, amount, note) {
+function upiPayLink(vpa, name, amount, note) {
   const params = `pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${Math.round(amount)}&cu=INR&tn=${encodeURIComponent(note || "")}`;
-  return {
-    // Plain upi:// triggers Android's native app chooser
-    any: `upi://pay?${params}`,
-    // GPay uses tez:// scheme on some devices, intent:// on others
-    gpay: `tez://upi/pay?${params}`,
-    // PhonePe's own scheme
-    phonepe: `phonepe://pay?${params}`,
-    // Paytm's own scheme
-    paytm: `paytmmp://pay?${params}`,
-  };
-}
-
-// Try to open UPI — uses multiple fallback methods
-function openUPI(uri) {
-  // Method 1: Create a real link and click it (most trusted by browsers)
-  const a = document.createElement("a");
-  a.href = uri;
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => document.body.removeChild(a), 100);
-}
-
-function UpiPayButtons({ vpa, name, amount, note }) {
-  const links = appLinks(vpa, name, amount, note);
-  const apps = [
-    ["any", "Any UPI app", "#8b7cf6"],
-    ["gpay", "Google Pay", "#2DA94F"],
-    ["phonepe", "PhonePe", "#5F259F"],
-    ["paytm", "Paytm", "#00BAF2"],
-  ];
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
-      {apps.map(([key, label, color]) => (
-        <a key={key} href={links[key]} className="upi-app-btn" style={{ borderColor: color, color }}>
-          {label}
-        </a>
-      ))}
-    </div>
-  );
+  return `upi://pay?${params}`;
 }
 
 export default function App() {
@@ -286,14 +247,22 @@ function Contribute({ data, name, vpa, treasurerId, onDone }) {
           <button className="primary wide" onClick={showPay}>Pay {name(treasurerId)} by UPI</button>
         ) : (
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{name(treasurerId)}</b> {inr(amount)}</p>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>Tap the QR to open PhonePe</p>
+            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Pay <b>{name(treasurerId)}</b></p>
+            <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>{inr(amount)}</div>
 
-            <a href={`phonepe://pay?pa=${encodeURIComponent(vpa(treasurerId))}&pn=${encodeURIComponent(name(treasurerId))}&am=${Math.round(Number(amount))}&cu=INR&tn=${encodeURIComponent(data.house.name + " fund")}`}>
-              <img src={qr} alt="UPI QR" style={{ borderRadius: 16, background: "#fff", padding: 10, cursor: "pointer", boxShadow: "0 4px 24px rgba(139,124,246,0.3)" }} />
-            </a>
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Option 1: Scan QR code</p>
+              <img src={qr} alt="QR code" style={{ borderRadius: 16, background: "#fff", padding: 12, boxShadow: "0 4px 24px rgba(139,124,246,0.3)", maxWidth: 200 }} />
+            </div>
 
-            <p style={{ fontSize: 12, color: "var(--muted)", margin: "12px 0", wordBreak: "break-all" }}>{vpa(treasurerId)}</p>
+            <div style={{ background: "var(--card-2)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Option 2: Pay using UPI ID</p>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "var(--accent)", marginBottom: 4, wordBreak: "break-all" }}>{vpa(treasurerId)}</div>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>Amount: {inr(amount)}</p>
+              <button className="wide small" onClick={() => { navigator.clipboard.writeText(vpa(treasurerId)); alert("Copied: " + vpa(treasurerId) + "\n\nNow open PhonePe → Send money → Paste UPI ID → Enter " + inr(amount)); }} style={{ background: "var(--accent-bg)", color: "var(--accent)", borderColor: "rgba(139,124,246,0.3)" }}>
+                📋 Copy UPI ID
+              </button>
+            </div>
 
             <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>✅ Payment done — add to fund</button>
           </div>
@@ -469,15 +438,22 @@ function Review({ data, name, vpa, onDone }) {
       <>
         <Header icon="💸" title="Pay reimbursement" sub={"Pay " + payQr.name} />
         <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 14, marginBottom: 4 }}>Pay <b>{payQr.name}</b></p>
-          <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 4 }}>{inr(payQr.amount)}</div>
-          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>Tap the QR to open PhonePe</p>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Pay <b>{payQr.name}</b></p>
+          <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>{inr(payQr.amount)}</div>
 
-          <a href={`phonepe://pay?pa=${encodeURIComponent(payQr.vpa)}&pn=${encodeURIComponent(payQr.name)}&am=${Math.round(payQr.amount)}&cu=INR&tn=Reimbursement`}>
-            <img src={payQr.img} alt="UPI QR" style={{ borderRadius: 16, background: "#fff", padding: 10, cursor: "pointer", boxShadow: "0 4px 24px rgba(139,124,246,0.3)" }} />
-          </a>
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Option 1: Scan QR code</p>
+            <img src={payQr.img} alt="QR code" style={{ borderRadius: 16, background: "#fff", padding: 12, boxShadow: "0 4px 24px rgba(139,124,246,0.3)", maxWidth: 200 }} />
+          </div>
 
-          <p style={{ fontSize: 12, color: "var(--muted)", margin: "12px 0", wordBreak: "break-all" }}>{payQr.vpa}</p>
+          <div style={{ background: "var(--card-2)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Option 2: Pay using UPI ID</p>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "var(--accent)", marginBottom: 4, wordBreak: "break-all" }}>{payQr.vpa}</div>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>Amount: {inr(payQr.amount)}</p>
+            <button className="wide small" onClick={() => { navigator.clipboard.writeText(payQr.vpa); alert("Copied: " + payQr.vpa + "\n\nNow open PhonePe → Send money → Paste UPI ID → Enter " + inr(payQr.amount)); }} style={{ background: "var(--accent-bg)", color: "var(--accent)", borderColor: "rgba(139,124,246,0.3)" }}>
+              📋 Copy UPI ID
+            </button>
+          </div>
 
           <button className="primary wide" onClick={confirmPaid} style={{ fontSize: 16, height: 48 }}>
             ✅ Payment done — deduct from fund
