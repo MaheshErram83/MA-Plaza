@@ -11,7 +11,7 @@ export async function GET() {
   const house = await store.getFirstHouse();
   if (!house) return NextResponse.json({ house: null });
   const id = house.id;
-  const [members, feed, config, fund, contributions, fundExpenses, reimbursements, fundInsights] = await Promise.all([
+  const [members, feed, config, fund, contributions, fundExpenses, reimbursements, fundInsights, messages] = await Promise.all([
     store.getMembers(id),
     store.getFeed(id),
     store.getConfig(id),
