@@ -563,18 +563,22 @@ function Settings({ data, name, setTab }) {
       <Header icon="⚙️" title="Settings" sub={data.house.name} />
 
       <div className="card" style={{ padding: 6 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-          <button onClick={() => setSubTab("members")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "members" ? "var(--accent)" : "transparent", color: subTab === "members" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
+          <button onClick={() => setSubTab("members")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "members" ? "var(--accent)" : "transparent", color: subTab === "members" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             👥 Members
           </button>
-          <button onClick={() => setSubTab("history")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "history" ? "var(--accent)" : "transparent", color: subTab === "history" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+          <button onClick={() => setSubTab("history")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "history" ? "var(--accent)" : "transparent", color: subTab === "history" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             📜 History
+          </button>
+          <button onClick={() => setSubTab("reports")} style={{ height: 44, border: "none", borderRadius: 10, background: subTab === "reports" ? "var(--accent)" : "transparent", color: subTab === "reports" ? "#fff" : "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            📊 Reports
           </button>
         </div>
       </div>
 
       {subTab === "members" && <SettingsMembers data={data} name={name} config={config} fund={fund} />}
       {subTab === "history" && <SettingsHistory data={data} name={name} />}
+      {subTab === "reports" && <SettingsReports data={data} name={name} />}
     </>
   );
 }
@@ -782,6 +786,164 @@ function SettingsHistory({ data, name }) {
             )}
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+
+function SettingsReports({ data, name }) {
+  const [period, setPeriod] = useState("monthly");
+  const contribs = data.contributions || [];
+  const reimbs = data.reimbursements || [];
+  const expenses = data.fundExpenses || [];
+  const all = [
+    ...contribs.map(c => ({ ...c, type: "in", ts: Number(c.created_at) })),
+    ...reimbs.filter(r => ["paid","completed"].includes(r.status)).map(r => ({ ...r, type: "reimb_out", ts: Number(r.updated_at || r.created_at) })),
+    ...expenses.map(e => ({ ...e, type: "exp_out", ts: Number(e.created_at) })),
+  ];
+
+  const now = new Date();
+  const dayMs = 86400000;
+  const filterStart = period === "daily" ? now.getTime() - dayMs
+    : period === "weekly" ? now.getTime() - 7 * dayMs
+    : new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const filtered = all.filter(r => r.ts >= filterStart);
+
+  // totals
+  const totalIn = filtered.filter(r => r.type === "in").reduce((s, r) => s + Number(r.amount), 0);
+  const totalOut = filtered.filter(r => r.type !== "in").reduce((s, r) => s + Number(r.amount), 0);
+  const net = totalIn - totalOut;
+
+  // category breakdown (expenses + reimbursements)
+  const byCat = {};
+  filtered.filter(r => r.type !== "in").forEach(r => {
+    const cat = r.category || "Other";
+    byCat[cat] = (byCat[cat] || 0) + Number(r.amount);
+  });
+  const catEntries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const catTotal = catEntries.reduce((s, [, v]) => s + v, 0);
+  const catColors = { Rent: "#7F77DD", Utilities: "#EF9F27", Groceries: "#1D9E75", Internet: "#378ADD", Repairs: "#D4537E", Food: "#D85A30", Other: "#888780" };
+
+  // member contributions
+  const byMember = {};
+  data.members.forEach(m => { byMember[m.id] = 0; });
+  filtered.filter(r => r.type === "in").forEach(r => { byMember[r.member_id] = (byMember[r.member_id] || 0) + Number(r.amount); });
+  const memberEntries = Object.entries(byMember).sort((a, b) => b[1] - a[1]);
+  const maxMemberAmt = Math.max(...memberEntries.map(([,v]) => v), 1);
+
+  // daily spending trend (last 7 days)
+  const dailySpend = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * dayMs);
+    const key = d.getDate() + "/" + (d.getMonth() + 1);
+    dailySpend[key] = 0;
+  }
+  all.filter(r => r.type !== "in" && r.ts >= now.getTime() - 7 * dayMs).forEach(r => {
+    const d = new Date(r.ts);
+    const key = d.getDate() + "/" + (d.getMonth() + 1);
+    if (dailySpend[key] !== undefined) dailySpend[key] += Number(r.amount);
+  });
+  const dailyEntries = Object.entries(dailySpend);
+  const maxDaily = Math.max(...dailyEntries.map(([,v]) => v), 1);
+
+  // reimbursement status breakdown
+  const statusCounts = {};
+  reimbs.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+  const statusEntries = Object.entries(statusCounts);
+
+  const periodLabel = period === "daily" ? "Today" : period === "weekly" ? "This week" : "This month";
+
+  return (
+    <>
+      <div className="card" style={{ padding: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
+          {[["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]].map(([key, label]) => (
+            <button key={key} onClick={() => setPeriod(key)} style={{ height: 38, border: "none", borderRadius: 8, background: period === key ? "var(--accent-bg)" : "transparent", color: period === key ? "var(--accent)" : "var(--muted)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hero" style={{ marginBottom: 14 }}>
+        <div className="label">{periodLabel}</div>
+        <div style={{ display: "flex", gap: 20, marginTop: 8 }}>
+          <div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--green)" }}>{inr(totalIn)}</div><div style={{ fontSize: 12, color: "var(--muted)" }}>Money in</div></div>
+          <div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--amber)" }}>{inr(totalOut)}</div><div style={{ fontSize: 12, color: "var(--muted)" }}>Money out</div></div>
+          <div><div style={{ fontSize: 24, fontWeight: 700, color: net >= 0 ? "var(--green)" : "var(--red)" }}>{net >= 0 ? "+" : ""}{inr(net)}</div><div style={{ fontSize: 12, color: "var(--muted)" }}>Net</div></div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>📊 Spending by category</h2>
+        {catEntries.length > 0 ? (
+          <>
+            <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 14 }}>
+              {catEntries.map(([c, v]) => <div key={c} style={{ width: (v / catTotal * 100) + "%", background: catColors[c] || "#888" }} title={c} />)}
+            </div>
+            {catEntries.map(([c, v]) => (
+              <div key={c} style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: catColors[c] || "#888", marginRight: 10, flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 14 }}>{c}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, marginRight: 8 }}>{inr(v)}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)", width: 36, textAlign: "right" }}>{Math.round(v / catTotal * 100)}%</span>
+              </div>
+            ))}
+          </>
+        ) : <div className="empty">No spending in this period.</div>}
+      </div>
+
+      <div className="card">
+        <h2>📈 Daily spending (last 7 days)</h2>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 120, marginBottom: 8 }}>
+          {dailyEntries.map(([day, amt]) => (
+            <div key={day} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>{amt > 0 ? inr(amt) : ""}</div>
+              <div style={{ width: "100%", background: amt > 0 ? "linear-gradient(180deg, var(--accent), var(--accent-2))" : "var(--card-2)", borderRadius: 4, height: Math.max(4, (amt / maxDaily) * 80), transition: "height .3s" }} />
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{day}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>👥 Member contributions</h2>
+        {memberEntries.map(([id, amt]) => (
+          <div key={id} style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 4 }}>
+              <span style={{ fontWeight: 500 }}>{name(id)}</span>
+              <span style={{ fontWeight: 600 }}>{inr(amt)}</span>
+            </div>
+            <div style={{ height: 8, background: "var(--card-2)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ width: (amt / maxMemberAmt * 100) + "%", height: "100%", background: "linear-gradient(90deg, var(--green), #34d399)", borderRadius: 4, transition: "width .4s" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h2>🧾 Reimbursement status</h2>
+        {statusEntries.length > 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {statusEntries.map(([status, count]) => {
+              const meta = STATUS_META[status] || { label: status, color: "var(--muted)", bg: "var(--card-2)" };
+              return (
+                <div key={status} style={{ background: meta.bg, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: meta.color }}>{count}</div>
+                  <div style={{ fontSize: 12, color: meta.color }}>{meta.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="empty">No reimbursements yet.</div>}
+      </div>
+
+      <div className="card">
+        <h2>💡 Summary</h2>
+        <div className="mrow"><span>Total transactions</span><span style={{ fontWeight: 600 }}>{filtered.length}</span></div>
+        <div className="mrow"><span>Avg spend per day</span><span style={{ fontWeight: 600 }}>{inr(totalOut / (period === "daily" ? 1 : period === "weekly" ? 7 : new Date().getDate()))}</span></div>
+        <div className="mrow"><span>Largest expense</span><span style={{ fontWeight: 600 }}>{inr(Math.max(...filtered.filter(r => r.type !== "in").map(r => Number(r.amount)), 0))}</span></div>
+        <div className="mrow"><span>Members who contributed</span><span style={{ fontWeight: 600 }}>{memberEntries.filter(([,v]) => v > 0).length} / {data.members.length}</span></div>
       </div>
     </>
   );
