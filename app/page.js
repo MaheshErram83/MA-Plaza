@@ -1036,30 +1036,39 @@ function Chat({ data, name, onDone }) {
   const [text, setText] = useState("");
   const [sender, setSender] = useState(data.members[0]?.id || "");
   const [refreshing, setRefreshing] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [showCallMenu, setShowCallMenu] = useState(false);
   const messages = [...(data.messages || [])].reverse();
+  const fileRef = { current: null };
+
+  const houseSlug = (data.house.name || "maplaza").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const jitsiRoom = "maplaza-" + houseSlug;
 
   async function send() {
-    if (!text.trim()) return;
-    await api("sendMessage", { memberId: sender, text: text.trim() });
-    setText("");
+    if (!text.trim() && !imagePreview) return;
+    const msgType = imagePreview ? "image" : "text";
+    const msgText = text.trim() || (imagePreview ? "📸 Photo" : "");
+    await api("sendMessage", { memberId: sender, text: msgText, image: imagePreview || null, msgType });
+    setText(""); setImagePreview(null);
     onDone();
   }
 
-  async function refreshChat() {
-    setRefreshing(true);
-    await onDone();
-    setRefreshing(false);
+  function onImagePick(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) return alert("File too large. Max 5MB.");
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result);
+    reader.readAsDataURL(f);
   }
 
-  // Auto-refresh every 5 seconds
+  async function refreshChat() { setRefreshing(true); await onDone(); setRefreshing(false); }
+
   useEffect(() => {
     const interval = setInterval(() => { onDone(); }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const senderName = name(sender);
-
-  // Group messages by date
   function dateLabel(ts) {
     const d = new Date(Number(ts));
     const today = new Date();
@@ -1068,25 +1077,28 @@ function Chat({ data, name, onDone }) {
     if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
     return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   }
-
-  function timeLabel(ts) {
-    return new Date(Number(ts)).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-  }
+  function timeLabel(ts) { return new Date(Number(ts)).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
 
   let lastDate = "";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)" }}>
+      {/* Header with call buttons */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 4px 8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className="logo">💬</div>
-          <div><h1 style={{ fontSize: 18 }}>House chat</h1><div className="sub">{data.members.length} members</div></div>
+          <div style={{ width: 42, height: 42, borderRadius: 14, background: "linear-gradient(135deg,#8b7cf6,#6d5ef0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: "0 4px 16px rgba(139,124,246,0.3)" }}>💬</div>
+          <div><h1 style={{ fontSize: 18, margin: 0 }}>House chat</h1><div style={{ fontSize: 11, color: "var(--muted)" }}>{data.members.length} members</div></div>
         </div>
-        <button className="small" onClick={refreshChat} style={{ fontSize: 18, border: "none", background: "none", color: "var(--muted)" }}>{refreshing ? "⏳" : "🔄"}</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <a href={"https://meet.jit.si/" + jitsiRoom + "#config.startWithAudioMuted=true"} target="_blank" rel="noopener" style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(52,211,153,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, textDecoration: "none", cursor: "pointer" }} title="Voice call">📞</a>
+          <a href={"https://meet.jit.si/" + jitsiRoom} target="_blank" rel="noopener" style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(96,165,250,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, textDecoration: "none", cursor: "pointer" }} title="Video call">📹</a>
+          <button onClick={refreshChat} style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, border: "none", cursor: "pointer", color: "var(--muted)" }}>{refreshing ? "⏳" : "🔄"}</button>
+        </div>
       </div>
 
+      {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 4px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-        {messages.length === 0 && <div className="empty" style={{ marginTop: 40 }}>No messages yet. Say hello to your roommates!</div>}
+        {messages.length === 0 && <div style={{ textAlign: "center", color: "var(--muted)", marginTop: 60, fontSize: 14 }}>No messages yet. Say hello! 👋</div>}
         {messages.map((m, i) => {
           const isMe = m.member_id === sender;
           const showDate = dateLabel(m.created_at) !== lastDate;
@@ -1095,22 +1107,23 @@ function Chat({ data, name, onDone }) {
             <div key={m.id || i}>
               {showDate && (
                 <div style={{ textAlign: "center", margin: "12px 0 8px" }}>
-                  <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--card-2)", padding: "4px 12px", borderRadius: 12 }}>{dateLabel(m.created_at)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--card-2)", padding: "4px 14px", borderRadius: 12 }}>{dateLabel(m.created_at)}</span>
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 2 }}>
                 <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
                   {!isMe && <span style={{ fontSize: 11, color: "var(--accent)", marginBottom: 2, marginLeft: 10 }}>{name(m.member_id)}</span>}
                   <div style={{
-                    background: isMe ? "linear-gradient(135deg, var(--accent), var(--accent-2))" : "var(--card-2)",
+                    background: isMe ? "linear-gradient(135deg,#8b7cf6,#6d5ef0)" : "rgba(23,23,31,0.8)",
+                    border: isMe ? "none" : "1px solid rgba(255,255,255,0.06)",
                     color: isMe ? "#fff" : "var(--ink)",
-                    padding: "10px 14px",
+                    padding: m.image ? "6px" : "10px 14px",
                     borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                    fontSize: 14,
-                    lineHeight: 1.5,
-                    wordBreak: "break-word",
+                    fontSize: 14, lineHeight: 1.5, wordBreak: "break-word",
                   }}>
-                    {m.text}
+                    {m.image && <img src={m.image} alt="photo" style={{ width: "100%", maxWidth: 240, borderRadius: 12, marginBottom: m.text && m.text !== "📸 Photo" ? 6 : 0 }} />}
+                    {m.text && m.text !== "📸 Photo" && <div>{m.text}</div>}
+                    {m.text === "📸 Photo" && !m.image && <div>📸 Photo</div>}
                   </div>
                   <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, marginRight: isMe ? 4 : 0, marginLeft: isMe ? 0 : 4 }}>{timeLabel(m.created_at)}</span>
                 </div>
@@ -1120,18 +1133,32 @@ function Chat({ data, name, onDone }) {
         })}
       </div>
 
-      <div style={{ padding: "8px 0 4px", borderTop: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-          <select value={sender} onChange={(e) => setSender(e.target.value)} style={{ flex: "0 0 auto", width: 100, fontSize: 12, height: 40 }}>
+      {/* Image preview */}
+      {imagePreview && (
+        <div style={{ padding: "8px 4px", borderTop: "1px solid var(--line)" }}>
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <img src={imagePreview} alt="preview" style={{ height: 80, borderRadius: 10, objectFit: "cover" }} />
+            <div onClick={() => setImagePreview(null)} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: "var(--red)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>✕</div>
+          </div>
+        </div>
+      )}
+
+      {/* Input bar */}
+      <div style={{ padding: "8px 0 4px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          <select value={sender} onChange={(e) => setSender(e.target.value)} style={{ flex: "0 0 auto", width: 90, fontSize: 11, height: 42, borderRadius: 12 }}>
             {data.members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <input value={text} placeholder={"Message as " + senderName + "..."} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} style={{ flex: 1, height: 40 }} />
-          <button className="primary" onClick={send} style={{ flex: "0 0 auto", height: 40, width: 44, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>➤</button>
+          <input type="file" accept="image/*" style={{ display: "none" }} id="chatImgInput" onChange={onImagePick} />
+          <button onClick={() => document.getElementById("chatImgInput").click()} style={{ flex: "0 0 auto", width: 42, height: 42, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", padding: 0 }}>📷</button>
+          <input value={text} placeholder="Message..." onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} style={{ flex: 1, height: 42, borderRadius: 12 }} />
+          <button onClick={send} style={{ flex: "0 0 auto", width: 42, height: 42, borderRadius: 12, background: "linear-gradient(135deg,#8b7cf6,#6d5ef0)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", color: "#fff", boxShadow: "0 4px 12px rgba(139,124,246,0.3)" }}>➤</button>
         </div>
       </div>
     </div>
   );
 }
+
 
 function Feed({ feed, limit }) {
   const items = limit ? (feed || []).slice(0, limit) : (feed || []);

@@ -47,7 +47,7 @@ export async function POST(req) {
   if (action === "addFundExpense") { await store.addFundExpense(id, body.expense); return NextResponse.json({ ok: true }); }
   if (action === "createReimbursement") { await store.createReimbursement(id, body.reimbursement); return NextResponse.json({ ok: true }); }
   if (action === "advanceReimbursement") { return NextResponse.json(await store.advanceReimbursement(id, body.reimbId, body.toStatus, body.note, body.proof)); }
-  if (action === "sendMessage") { await store.sendMessage(id, body.memberId, body.text); return NextResponse.json({ ok: true }); }
+  if (action === "sendMessage") { await store.sendMessage(id, body.memberId, body.text, body.image, body.msgType); return NextResponse.json({ ok: true }); }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });
 }
