@@ -49,6 +49,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Splash screen max 2 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Capture the install prompt
   useEffect(() => {
@@ -83,12 +90,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return (
+  if (loading && !splashDone) return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#0d0d12" }}>
       <div style={{ width: 80, height: 80, borderRadius: 20, background: "linear-gradient(135deg,#8b7cf6,#6d5ef0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, boxShadow: "0 8px 40px rgba(139,124,246,0.4)", marginBottom: 20, animation: "pulse 1.5s infinite" }}>🏦</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: "#f2f2f7", marginBottom: 6 }}>MA Plaza</div>
       <div style={{ fontSize: 13, color: "#8b8b98", marginBottom: 24 }}>One app for all things home</div>
       <div style={{ width: 40, height: 40, border: "3px solid rgba(139,124,246,0.2)", borderTopColor: "#8b7cf6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
+  if (loading && splashDone) return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#0d0d12" }}>
+      <div style={{ width: 60, height: 60, borderRadius: 16, background: "linear-gradient(135deg,#8b7cf6,#6d5ef0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, boxShadow: "0 6px 30px rgba(139,124,246,0.3)", marginBottom: 16 }}>🏦</div>
+      <div style={{ fontSize: 14, color: "#8b8b98", marginBottom: 16 }}>Waking up the database...</div>
+      <div style={{ width: 36, height: 36, border: "3px solid rgba(139,124,246,0.2)", borderTopColor: "#8b7cf6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ fontSize: 11, color: "#5a5a68", marginTop: 16 }}>Free tier database sleeps after inactivity</div>
     </div>
   );
   if (!data.house) return <Setup onDone={refresh} />;
