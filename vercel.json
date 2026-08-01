@@ -1,9 +1,1 @@
-{
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/house",
-      "schedule": "*/4 * * * *"
-    }
-  ]
-}
+{"framework":"nextjs"}
