@@ -83,7 +83,14 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="wrap"><p style={{ padding: 40, color: "var(--muted)" }}>Loading…</p></div>;
+  if (loading) return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#0d0d12" }}>
+      <div style={{ width: 80, height: 80, borderRadius: 20, background: "linear-gradient(135deg,#8b7cf6,#6d5ef0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, boxShadow: "0 8px 40px rgba(139,124,246,0.4)", marginBottom: 20, animation: "pulse 1.5s infinite" }}>🏦</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: "#f2f2f7", marginBottom: 6 }}>MA Plaza</div>
+      <div style={{ fontSize: 13, color: "#8b8b98", marginBottom: 24 }}>One app for all things home</div>
+      <div style={{ width: 40, height: 40, border: "3px solid rgba(139,124,246,0.2)", borderTopColor: "#8b7cf6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
   if (!data.house) return <Setup onDone={refresh} />;
 
   const name = (id) => data.members.find((m) => m.id === id)?.name || "?";
